@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de tasks</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e4e3df;
+    --decisao: #b42318; --decisao-bg: #fdecea; --espera: #9a5b00; --espera-bg: #fff4e0;
+    --bloq: #6941c6; --bloq-bg: #f1ecfd; --and: #175cd3; --and-bg: #e8f0fe;
+    --ok: #067647; --ok-bg: #e5f6ec; --nova: #6b6b66; --nova-bg: #efefec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --panel: #1d1d1b; --ink: #ecebe6; --muted: #9b9a94; --line: #2f2e2b;
+      --decisao: #ff8a80; --decisao-bg: #3a1d1b; --espera: #f5b860; --espera-bg: #33270f;
+      --bloq: #b9a3f5; --bloq-bg: #271f3d; --and: #8ab4f8; --and-bg: #182a45;
+      --ok: #6fd39b; --ok-bg: #12301f; --nova: #9b9a94; --nova-bg: #262624;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 20px 28px 8px; display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; }
+  h1 { font-size: 20px; margin: 0; }
+  .meta { color: var(--muted); font-size: 12.5px; }
+  .meta .warn { color: var(--decisao); font-weight: 600; }
+  .band { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; padding: 12px 28px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+  .stat b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 12.5px; }
+  .stat.decisao b { color: var(--decisao); } .stat.espera b { color: var(--espera); }
+  .stat.bloqueada b { color: var(--bloq); } .stat.pronta b { color: var(--ok); }
+  main { padding: 8px 28px 32px; }
+  .decisions { display: grid; gap: 8px; margin-bottom: 14px; }
+  .decision { border-left: 4px solid var(--decisao); background: var(--decisao-bg); border-radius: 6px; padding: 10px 14px; }
+  .decision strong { color: var(--decisao); }
+  .tablewrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; min-width: 980px; }
+  th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  tr.child td:first-child { padding-left: 34px; position: relative; }
+  tr.child td:first-child::before { content: "↳"; position: absolute; left: 16px; color: var(--muted); }
+  a { color: inherit; }
+  .id { font-variant-numeric: tabular-nums; color: var(--muted); margin-right: 6px; }
+  .sub { color: var(--muted); font-size: 12.5px; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .g-decisao { color: var(--decisao); background: var(--decisao-bg); }
+  .g-espera { color: var(--espera); background: var(--espera-bg); }
+  .g-bloqueada { color: var(--bloq); background: var(--bloq-bg); }
+  .g-andamento { color: var(--and); background: var(--and-bg); }
+  .g-pronta { color: var(--ok); background: var(--ok-bg); }
+  .g-nova { color: var(--nova); background: var(--nova-bg); }
+  .bar { width: 110px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 5px; }
+  .bar i { display: block; height: 100%; background: var(--ok); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 11.5px; padding: 1px 7px; border-radius: 5px; border: 1px solid var(--line); white-space: nowrap; }
+  .chip.me { border-color: var(--espera); color: var(--espera); }
+  .chip.bad { border-color: var(--decisao); color: var(--decisao); }
+  .ci-passando { color: var(--ok); } .ci-falhando { color: var(--decisao); font-weight: 600; } .ci-pendente { color: var(--espera); }
+  .stale { color: var(--decisao); font-weight: 600; }
+  .empty { padding: 40px; text-align: center; color: var(--muted); }
+  details { margin-top: 18px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font-size: 12px; }
+  .live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: middle; }
+  .live.on { background: var(--ok); }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Painel</h1>
+  <div class="meta" id="meta"></div>
+</header>
+<section class="band" id="band"></section>
+<main>
+  <div class="decisions" id="decisions"></div>
+  <div class="tablewrap"><table>
+    <thead><tr>
+      <th>Task</th><th>Repo e branch</th><th>Fase</th><th>Critérios</th><th>CI / PR</th><th>Falta para o merge</th><th>Agente</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <details><summary>Eventos recentes</summary><pre id="events"></pre></details>
+</main>
+<script>
+const INITIAL = /*__INITIAL_DATA__*/null;
+const GROUP_LABEL = { decisao: 'Aguardando decisão', espera: 'Espera por você', bloqueada: 'Bloqueada', andamento: 'Em andamento', pronta: 'Pronta para merge', nova: 'Nova' };
+const FASE_LABEL = { nova: 'Nova', spec: 'Spec', 'spec-aprovada': 'Spec aprovada', implementando: 'Implementando', gate: 'Gate', revisao: 'Revisão', 'teste-manual': 'Teste manual', 'pronta-merge': 'Pronta p/ merge', bloqueada: 'Bloqueada', 'aguardando-decisao': 'Aguardando decisão' };
+const ME = new Set(['revisao-humana', 'teste-navegador', 'teste-manual']);
+const BAD = /^(conflito|ci-falhando|sem-spec|aguarda-filha-)/;
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function ago(iso) {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (isNaN(ms)) return '';
+  const m = Math.round(ms / 60000);
+  if (m < 1) return 'agora';
+  if (m < 60) return `há ${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `há ${h} h`;
+  return `há ${Math.round(h / 24)} d`;
+}
+const hoursSince = (iso) => (Date.now() - new Date(iso).getTime()) / 3600000;
+
+function adoLink(d, t) {
+  if (t.url) return t.url;
+  if (d.ado_url) return `${d.ado_url.replace(/\/$/, '')}/_workitems/edit/${encodeURIComponent(t.id)}`;
+  return '';
+}
+
+function row(d, t, child) {
+  const link = adoLink(d, t);
+  const title = link ? `<a href="${esc(link)}" target="_blank" rel="noopener">${esc(t.titulo || '(sem título)')}</a>` : esc(t.titulo || '(sem título)');
+  const pct = t.ca_total ? Math.round((t.ca_ok / t.ca_total) * 100) : 0;
+  const crit = t.ca_total ? `${t.ca_ok} de ${t.ca_total}<div class="bar"><i style="width:${pct}%"></i></div>` : '<span class="sub">sem critérios</span>';
+  const ci = t.ci && t.ci !== 'sem-pr' ? `<span class="ci-${esc(t.ci)}">${esc(t.ci)}</span>` : '<span class="sub">sem PR</span>';
+  const pr = t.pr ? (t.pr_url ? ` · <a href="${esc(t.pr_url)}" target="_blank" rel="noopener">PR ${esc(t.pr)}</a>` : ` · PR ${esc(t.pr)}`) : '';
+  const pend = [...(t.pendencias || [])];
+  if (t.spec_aprovada !== true && ['spec', 'nova'].includes(t.fase)) pend.unshift(t.fase === 'spec' ? 'aprovar-spec' : 'sem-spec');
+  const chips = pend.length ? `<div class="chips">${pend.map((p) => `<span class="chip ${ME.has(p) || p === 'aprovar-spec' ? 'me' : BAD.test(p) ? 'bad' : ''}">${esc(p)}</span>`).join('')}</div>` : '<span class="sub">—</span>';
+  const staleH = hoursSince(t.ultima_atividade);
+  const stale = staleH > 24 && t.grupo !== 'pronta' ? `<div class="stale">parada ${ago(t.ultima_atividade)}</div>` : `<div class="sub">${ago(t.ultima_atividade)}</div>`;
+  const kids = t.filhas && t.filhas.length ? `<div class="sub">filhas: ${t.filhas_prontas}/${t.filhas.length} prontas</div>` : '';
+  const extra = t.decisao ? `<div class="sub" style="color:var(--decisao)">decisão: ${esc(t.decisao)}</div>` : t.trabalho_novo ? `<div class="sub" style="color:var(--decisao)">trabalho novo: ${esc(t.trabalho_novo)}</div>` : '';
+  return `<tr class="${child ? 'child' : ''}">
+    <td><span class="id">#${esc(t.id)}</span>${title}${kids}${extra}</td>
+    <td>${esc(t.repo || d.repo)}<div class="sub">${esc(t.branch || '')}</div></td>
+    <td><span class="pill g-${esc(t.grupo)}">${esc(GROUP_LABEL[t.grupo] || t.grupo)}</span><div class="sub">${esc(FASE_LABEL[t.fase] || t.fase || '')}${t.gate && t.gate !== 'nao-rodou' ? ' · gate ' + esc(t.gate) : ''}</div></td>
+    <td>${crit}</td>
+    <td>${ci}${pr}</td>
+    <td>${chips}</td>
+    <td>${esc(t.agente || '—')}${stale}${t.ultimo_evento ? `<div class="sub">${esc(t.ultimo_evento)}</div>` : ''}</td>
+  </tr>`;
+}
+
+function draw(d, live) {
+  document.getElementById('title').textContent = `Painel · ${d.repo}`;
+  document.title = `${d.resumo.decisao + d.resumo.espera ? '(' + (d.resumo.decisao + d.resumo.espera) + ') ' : ''}Painel · ${d.repo}`;
+  const syncOld = !d.ultima_sync || hoursSince(d.ultima_sync) > 12;
+  document.getElementById('meta').innerHTML =
+    `<span class="live ${live ? 'on' : ''}"></span>${live ? 'ao vivo' : 'instantâneo (abra pelo servidor para atualizar sozinho)'} · gerado ${esc(ago(d.gerado_em))} · ` +
+    (d.ultima_sync ? `<span class="${syncOld ? 'warn' : ''}">última sincronização ${esc(ago(d.ultima_sync))}</span>` : '<span class="warn">nunca sincronizado: rode /sync</span>');
+  const r = d.resumo;
+  document.getElementById('band').innerHTML = [
+    ['decisao', r.decisao, 'aguardam sua decisão'],
+    ['espera', r.espera, 'esperam por você'],
+    ['bloqueada', r.bloqueada, 'bloqueadas'],
+    ['andamento', r.andamento, 'em andamento'],
+    ['pronta', r.pronta, 'prontas para merge'],
+  ].map(([k, n, l]) => `<div class="stat ${k}"><b>${n}</b><span>${l}</span></div>`).join('');
+
+  const dec = d.tasks.filter((t) => t.grupo === 'decisao');
+  document.getElementById('decisions').innerHTML = dec.map((t) =>
+    `<div class="decision"><strong>#${esc(t.id)} ${esc(t.titulo || '')}</strong> — ${esc(t.decisao || t.trabalho_novo || 'ver arquivo da task')} <span class="sub">(${esc(t.arquivo)})</span></div>`).join('');
+
+  const byId = Object.fromEntries(d.tasks.map((t) => [t.id, t]));
+  const sortFn = (a, b) => a.ordem - b.ordem || (new Date(a.ultima_atividade) - new Date(b.ultima_atividade));
+  const roots = d.tasks.filter((t) => !t.mae || !byId[t.mae]).sort(sortFn);
+  const html = [];
+  const seen = new Set();
+  const add = (t, depth) => {
+    if (seen.has(t.id)) return;
+    seen.add(t.id);
+    html.push(row(d, t, depth > 0));
+    d.tasks.filter((k) => k.mae === t.id).sort(sortFn).forEach((k) => add(k, depth + 1));
+  };
+  roots.forEach((t) => add(t, 0));
+  d.tasks.filter((t) => !seen.has(t.id)).forEach((t) => add(t, 0));
+  document.getElementById('rows').innerHTML = html.join('') || '<tr><td colspan="7" class="empty">Nenhuma task ainda. Rode /sync ou /spec &lt;id&gt;.</td></tr>';
+  document.getElementById('events').textContent = (d.eventos || []).join('\n') || 'sem eventos';
+}
+
+let data = INITIAL;
+if (data) draw(data, false);
+if (location.protocol.startsWith('http')) {
+  const tick = async () => {
+    try {
+      const res = await fetch('index.json', { cache: 'no-store' });
+      if (res.ok) { data = await res.json(); draw(data, true); }
+    } catch {}
+  };
+  tick();
+  setInterval(tick, 3000);
+} else {
+  setInterval(() => data && draw(data, false), 60000);
+}
+</script>
+</body>
+</html>

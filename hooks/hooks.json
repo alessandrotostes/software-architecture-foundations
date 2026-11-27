@@ -1,0 +1,23 @@
+{
+  "description": "Fluxo de tasks: registra eventos no .work-state/ do repositório (só se ele existir) e bloqueia git push quando o gate da task não passou.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/kit/ws.mjs\" guard", "timeout": 10 }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|PowerShell|Edit|Write|MultiEdit",
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/kit/ws.mjs\" hook", "timeout": 10 }]
+      }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/kit/ws.mjs\" hook", "timeout": 10 }] }
+    ],
+    "SubagentStop": [
+      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/kit/ws.mjs\" hook", "timeout": 10 }] }
+    ]
+  }
+}

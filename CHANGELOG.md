@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.0.0 — 2026-11-27
+
+### Adicionado
+- O repositório vira um **plugin do Claude Code** (`.claude-plugin/plugin.json` e `marketplace.json`),
+  com a skill de arquitetura e um fluxo de trabalho com agentes no mesmo pacote.
+- Skills do fluxo: `spec`, `implement`, `gate`, `dispatch`, `sync` e `painel`.
+- `kit/`: regras comuns (precedência entre projeto e skill, contexto vivo, parada para decisão humana,
+  trabalho novo e tasks filhas), formato do estado por task e `ws.mjs` (estado, eventos, painel em
+  tempo real, servidor local e hooks, sem dependências).
+- `hooks/hooks.json`: registro automático de eventos no painel e bloqueio de `git push` sem gate.
+- O fluxo usa a skill de arquitetura em cada etapa: fluxo A na spec, TDD e checklist D na
+  implementação, checklist de revisão com severidades no gate, rascunho de ADR nas decisões arquiteturais.
+
+### Alterado
+- **Quebra de caminho:** a skill de arquitetura saiu da raiz para `skills/software-architecture-foundations/`.
+  Quem copia a pasta manualmente deve usar o novo caminho; o conteúdo da skill não mudou.
+- READMEs reescritos para as duas partes.
+
 ## 1.1.0 — 2026-11-25
 
 ### Adicionado
