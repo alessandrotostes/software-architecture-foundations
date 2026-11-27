@@ -12,12 +12,14 @@ Leia antes, inteiros: `KIT/regras.md` e `KIT/formato.md`.
 
 O caminho do estado é `node KIT/ws.mjs dir` (num worktree ele aponta para o `.work-state/` do repositório principal; no modo projeto, para o da pasta do projeto; se a variável `WORK_STATE_DIR` estiver definida, ela manda).
 
+Num agente do `/dispatch`, a pasta de trabalho é o `worktree` da task. No modo projeto ela é `.worktrees/<id>/`, com a mesma estrutura da pasta do projeto, então os caminhos de `repos` (`backend`, `frontend`...) valem igual nos dois casos.
+
 1. Leia `tasks/<id>.md`.
    - Se `spec_aprovada` não for `true`: pare e avise.
    - Se `fase` for `aguardando-decisao`: só continue se houver `- Resposta:` no bloco; então retome como em `regras.md` seção 3. Senão, pare e repita qual decisão falta.
    - Se `fase` for `bloqueada`: pare e diga o que bloqueia.
 2. Contexto vivo: seção 1 de `regras.md`. Releia as regras listadas na spec (e a spec em `spec_path`, se houver). Arquitetura: leia `SAF/SKILL.md` (fluxos B, C e D) e `SAF/references/tdd.md`; para TypeScript, Node ou React, `SAF/references/typescript-react.md`; ao considerar um padrão de projeto, `SAF/references/design-patterns.md`. A precedência entre projeto e SAF está em `regras.md` seção 0.
-3. Confirme que está na branch da task (`branch`). Se não estiver e não houver alterações locais, crie ou troque para ela; se houver alterações de outra coisa, pare e avise. No modo projeto, faça isso em cada repositório de `repos` (`git -C <caminho> ...`), criando a branch a partir da `base` daquele repositório em `config.repos`.
+3. Confirme que está na branch da task (`branch`). Se não estiver e não houver alterações locais, crie ou troque para ela; se houver alterações de outra coisa, pare e avise. No modo projeto, faça isso em cada repositório de `repos` (`git -C <caminho> ...`), criando a branch a partir da `base` daquele repositório em `config.repos`. Num worktree do `/dispatch` a branch já está certa; se ele é novo, instale as dependências de cada repositório com o comando do projeto (o do `package.json` ou equivalente) antes do primeiro teste.
 4. Marque `fase: implementando`, `agente` (se vazio), `atualizado_em`. Rode `ws.mjs event evento=agente-iniciado`.
 5. Para cada passo do plano, em ordem:
    1. se o passo é lógica (regra de negócio, caso de uso, decisão): escreva antes o teste do critério, nomeado com o id (`it('CA-2: deve … quando …')`), e confirme que ele falha. Se é cola, configuração ou layout sem lógica: teste de integração/e2e do fluxo ou nenhum, com o motivo no `## Log`;

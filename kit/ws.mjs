@@ -11,6 +11,7 @@
 //   context-status           lista as fontes de contexto e diz se o context-summary.md está velho
 //   hook                     entrada de hook (Stop, SubagentStop, PostToolUse, PostToolUseFailure): lê JSON do stdin
 //   guard                    hook PreToolUse: bloqueia git push se o gate da task não passou
+//   worktree add|remove <id> worktrees da task em .worktrees/<id>/ (dentro da pasta, para o dispatch)
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -21,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 const KIT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DIRNAME = '.work-state';
+const WT_DIR = '.worktrees'; // worktrees do dispatch: dentro da pasta, visíveis num sandbox que só expõe a pasta
 
 // ---------- git / caminhos ----------
 
@@ -164,9 +166,17 @@ function taskFromBranch(branch) {
   return m ? m[1] : '';
 }
 
+// .../.worktrees/<id>/... -> <id>
+function taskFromWorktreePath(p) {
+  const m = path.resolve(p).match(/[\\/]\.worktrees[\\/]([^\\/]+)/);
+  return m ? m[1] : '';
+}
+
 function inferTask(cwd, stateDir = findStateDir(cwd)) {
   if (process.env.WS_TASK) return process.env.WS_TASK;
   if (mainRepoRoot(cwd)) return taskFromBranch(currentBranch(cwd));
+  const wt = taskFromWorktreePath(cwd);
+  if (wt && stateDir && fs.existsSync(path.join(stateDir, 'tasks', `${wt}.md`))) return wt;
   // Raiz do projeto, fora de qualquer repositório: vale a task se só uma branch tiver arquivo de task.
   const cfg = stateDir ? readConfig(stateDir) : {};
   if (cfg.modo !== 'projeto') return '';
@@ -181,6 +191,8 @@ function inferTask(cwd, stateDir = findStateDir(cwd)) {
 function inferAgent(cwd) {
   if (process.env.WS_AGENT) return process.env.WS_AGENT;
   const top = git(['rev-parse', '--show-toplevel'], cwd);
+  const wt = taskFromWorktreePath(top || cwd);
+  if (wt) return `wt-${wt}`;
   if (!top) return 'principal'; // raiz do projeto
   return path.resolve(top) === path.resolve(mainRepoRoot(cwd)) ? 'principal' : path.basename(top);
 }
@@ -434,6 +446,8 @@ function initProject(root) {
     const repo = { caminho, remote: sanitizeRemote(git(['remote', 'get-url', 'origin'], dir)), base: defaultBranch(dir) };
     // repositório só de contexto (ADRs, convenções): lido nas regras, sem tasks nem PRs
     if (/^\.?context/i.test(path.basename(dir))) repo.contexto = true;
+    const locais = localFiles(dir);
+    if (locais.length) repo.arquivos_locais = locais;
     cfg.repos.push(repo);
   }
   cfg.repos.sort((a, b) => a.caminho.localeCompare(b.caminho));
@@ -448,16 +462,134 @@ function initRepo(root) {
   const cfg = path.join(stateDir, 'config.json');
   if (!fs.existsSync(cfg)) {
     const remote = sanitizeRemote(git(['remote', 'get-url', 'origin'], root));
-    fs.writeFileSync(cfg, JSON.stringify({ repo: path.basename(root), remote, ...ADO_DEFAULTS }, null, 2) + '\n');
+    const locais = localFiles(root);
+    fs.writeFileSync(cfg, JSON.stringify({ repo: path.basename(root), remote, ...(locais.length ? { arquivos_locais: locais } : {}), ...ADO_DEFAULTS }, null, 2) + '\n');
   }
-  const exclude = path.join(root, '.git', 'info', 'exclude');
-  fs.mkdirSync(path.dirname(exclude), { recursive: true });
-  const cur = fs.existsSync(exclude) ? fs.readFileSync(exclude, 'utf8') : '';
-  if (!cur.split(/\r?\n/).some((l) => l.trim() === `${DIRNAME}/` || l.trim() === DIRNAME)) {
-    fs.appendFileSync(exclude, `${cur && !cur.endsWith('\n') ? '\n' : ''}${DIRNAME}/\n`);
-  }
+  excludeLocally(root, DIRNAME);
   render(stateDir);
   return stateDir;
+}
+
+// Acrescenta uma linha ao info/exclude do repositório (nunca ao .gitignore do time). O arquivo fica
+// no diretório git comum, então vale para a cópia principal e para todos os worktrees.
+function appendExclude(repoDir, line) {
+  const common = git(['rev-parse', '--path-format=absolute', '--git-common-dir'], repoDir) || path.join(repoDir, '.git');
+  const exclude = path.join(common, 'info', 'exclude');
+  fs.mkdirSync(path.dirname(exclude), { recursive: true });
+  const cur = fs.existsSync(exclude) ? fs.readFileSync(exclude, 'utf8') : '';
+  if (!cur.split(/\r?\n/).some((l) => l.trim() === line)) {
+    fs.appendFileSync(exclude, `${cur && !cur.endsWith('\n') ? '\n' : ''}${line}\n`);
+  }
+}
+
+function excludeLocally(root, name) {
+  const exclude = path.join(root, '.git', 'info', 'exclude');
+  const cur = fs.existsSync(exclude) ? fs.readFileSync(exclude, 'utf8') : '';
+  if (!cur.split(/\r?\n/).some((l) => l.trim() === name)) appendExclude(root, `${name}/`);
+}
+
+// .env* da raiz do repositório que o git ignora: não vêm num worktree novo, o dispatch copia.
+function localFiles(repo) {
+  let names;
+  try { names = fs.readdirSync(repo); } catch { return []; }
+  const cand = names.filter((n) => /^\.env(\..+)?$/.test(n) && !/example|sample|template/i.test(n));
+  if (!cand.length) return [];
+  return git(['check-ignore', ...cand], repo).split(/\r?\n/).filter(Boolean).sort();
+}
+
+// ---------- worktrees (dispatch) ----------
+//
+// Um worktree por repositório da task, em <pasta>/.worktrees/<id>/<caminho> (modo projeto) ou
+// <repo>/.worktrees/<id> (modo repositório). Ficam dentro da pasta da sessão de propósito: num
+// sandbox que só expõe essa pasta, um worktree fora dela não existiria.
+
+function gitOrThrow(args, cwd, what) {
+  try {
+    return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  } catch (e) {
+    throw new Error(`${what}: ${String(e.stderr || e.message).trim()}`);
+  }
+}
+
+function readTask(stateDir, id) {
+  const file = path.join(stateDir, 'tasks', `${id}.md`);
+  if (!fs.existsSync(file)) throw new Error(`a task ${id} não existe em ${path.dirname(file)}`);
+  return parseFrontmatter(fs.readFileSync(file, 'utf8')).data;
+}
+
+function taskRepos(stateDir, id, data) {
+  const root = path.dirname(stateDir);
+  const cfg = readConfig(stateDir);
+  if (cfg.modo !== 'projeto') {
+    return [{ caminho: '.', repo: root, wt: path.join(root, WT_DIR, id), base: cfg.base, arquivos_locais: cfg.arquivos_locais || [] }];
+  }
+  const lista = (Array.isArray(data.repos) ? data.repos : data.repos ? [data.repos] : []).map(String);
+  if (!lista.length) throw new Error(`a task ${id} não tem repos: a spec define quais repositórios ela toca`);
+  return lista.map((c) => {
+    const r = (cfg.repos || []).find((x) => x.caminho === c);
+    if (!r) throw new Error(`o repositório ${c} da task ${id} não está em config.repos (rode ws.mjs init)`);
+    return { caminho: c, repo: path.join(root, c), wt: path.join(root, WT_DIR, id, c), base: r.base, arquivos_locais: r.arquivos_locais || [] };
+  });
+}
+
+function copyLocalFiles(r) {
+  const copied = [];
+  for (const f of r.arquivos_locais) {
+    const src = path.resolve(r.repo, f);
+    const dst = path.resolve(r.wt, f);
+    if (path.relative(r.repo, src).startsWith('..') || !fs.existsSync(src)) continue;
+    if (!fs.existsSync(dst)) {
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      fs.copyFileSync(src, dst);
+      copied.push(f);
+    }
+    // se a branch da task não ignora o arquivo (segredos, em geral), um `git add -A` o commitaria
+    if (!git(['check-ignore', f], r.wt)) appendExclude(r.wt, `/${f.replace(/\\/g, '/')}`);
+  }
+  return copied;
+}
+
+function worktreeAdd(stateDir, id) {
+  const data = readTask(stateDir, id);
+  const branch = String(data.branch || '');
+  if (!branch) throw new Error(`a task ${id} não tem branch`);
+  const repos = taskRepos(stateDir, id, data);
+  // confere tudo antes de criar qualquer worktree, para não deixar a task pela metade
+  for (const r of repos) {
+    if (isDir(r.wt)) {
+      if (currentBranch(r.wt) !== branch) throw new Error(`${r.wt} existe mas não está na branch ${branch}`);
+    } else if (currentBranch(r.repo) === branch) {
+      throw new Error(`a branch ${branch} está em uso na cópia principal de ${r.caminho}: troque essa cópia para outra branch (ex.: ${r.base || 'main'}) antes do dispatch`);
+    }
+  }
+  const projeto = readConfig(stateDir).modo === 'projeto';
+  if (!projeto) excludeLocally(repos[0].repo, WT_DIR);
+  const worktrees = [];
+  for (const r of repos) {
+    let estado = 'reaproveitado';
+    if (!isDir(r.wt)) {
+      fs.mkdirSync(path.dirname(r.wt), { recursive: true });
+      const exists = git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], r.repo);
+      const base = r.base || defaultBranch(r.repo) || 'HEAD';
+      const start = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${base}`], r.repo) ? `origin/${base}` : base;
+      const args = exists ? ['worktree', 'add', r.wt, branch] : ['worktree', 'add', '--no-track', '-b', branch, r.wt, start];
+      gitOrThrow(args, r.repo, `não consegui criar o worktree de ${r.caminho}`);
+      estado = 'criado';
+    }
+    worktrees.push({ caminho: r.caminho, path: r.wt, estado, copiados: copyLocalFiles(r) });
+  }
+  const cwd = projeto ? path.join(path.dirname(stateDir), WT_DIR, id) : repos[0].wt;
+  return { task: id, branch, cwd, worktrees };
+}
+
+function worktreeRemove(stateDir, id) {
+  const repos = taskRepos(stateDir, id, readTask(stateDir, id)).filter((r) => isDir(r.wt));
+  const dirty = repos.filter((r) => gitOrThrow(['status', '--porcelain'], r.wt, `não consegui ler ${r.wt}`) !== '');
+  if (dirty.length) throw new Error(`há alterações não commitadas em: ${dirty.map((r) => r.caminho).join(', ')}. Commite ou descarte antes de remover`);
+  // --force só porque arquivos ignorados (.env copiado, node_modules) impediriam a remoção
+  for (const r of repos) gitOrThrow(['worktree', 'remove', '--force', r.wt], r.repo, `não consegui remover o worktree de ${r.caminho}`);
+  try { fs.rmdirSync(path.join(path.dirname(stateDir), WT_DIR, id)); } catch {}
+  return { task: id, removidos: repos.map((r) => r.caminho) };
 }
 
 // ---------- context-status ----------
@@ -666,10 +798,22 @@ function main() {
       }
       case 'serve': serve(existingStateDir(cwd), Number(args[0]) || 4777); break;
       case 'context-status': console.log(JSON.stringify(contextStatus(cwd), null, 2)); break;
+      case 'worktree': {
+        const [sub, id] = args;
+        if (!['add', 'remove'].includes(sub) || !id) throw new Error('uso: ws.mjs worktree add|remove <id>');
+        const d = existingStateDir(cwd);
+        console.log(JSON.stringify(sub === 'add' ? worktreeAdd(d, id) : worktreeRemove(d, id), null, 2));
+        break;
+      }
       case 'hook': try { hook(); } catch {} process.exit(0); // hook nunca falha a sessão
       case 'guard': { let code = 0; try { code = guard(); } catch {} process.exit(code); }
       default:
-        console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 14).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
+        const help = [];
+        for (const l of fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1)) {
+          if (!l.startsWith('//')) break;
+          help.push(l.replace(/^\/\/ ?/, ''));
+        }
+        console.log(help.join('\n'));
         process.exit(cmd ? 1 : 0);
     }
   } catch (e) {

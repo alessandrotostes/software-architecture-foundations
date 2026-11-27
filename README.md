@@ -109,15 +109,16 @@ completo, por exemplo `/software-architecture-foundations:spec`.
 
 | Comando | O que faz |
 |---|---|
-| `/sync` | Atualiza o estado do repositório atual com as tasks (Azure DevOps via MCP), PRs e CI |
+| `/sync` | Busca as tasks disponíveis no Azure DevOps (suas e sem responsável, na área do sistema), pergunta quais vão ser trabalhadas e atualiza PRs e CI das que já estão no painel |
 | `/painel` | Roda o sync e abre o painel do repositório, que se atualiza sozinho |
 | `/spec <id>` | Escreve a spec com desenho, critérios de aceite testáveis e plano; para e espera você aprovar (`/spec aprovar <id>`) |
 | `/implement <id>` | Implementa a spec aprovada em passos pequenos, test-first na lógica, e roda o gate |
 | `/gate <id>` | Confere cada critério com evidência e revisa o diff com o checklist de arquitetura, em contexto isolado; não corrige nada |
-| `/dispatch <id> <id>` | Dispara um agente headless por task, cada um no seu worktree, todos no mesmo painel |
+| `/dispatch <id> <id>` | Dispara um agente headless por task, cada um nos seus worktrees (um por repositório que a task toca, dentro da pasta), todos no mesmo painel; até `max_agentes` (padrão 2) |
 
-Fluxo do dia: `/painel` de manhã → `/spec` → você aprova → `/dispatch` → os agentes rodam
-`/implement` e `/gate` → você revisa e faz o merge.
+Fluxo do dia: `/sync` para escolher as tasks → `/spec` de cada uma → você aprova → `/dispatch`
+das aprovadas (em paralelo) → os agentes rodam `/implement` e `/gate` → `/painel` para acompanhar
+→ você revisa e faz o merge.
 
 **Onde fica o estado.** Em `<repositório>/.work-state/`, excluído do git só localmente
 (`.git/info/exclude`), então nada pessoal vai para o repositório do time. Os worktrees gravam
@@ -128,7 +129,8 @@ repositórios dentro (por exemplo `minha-app/` com `backend/`, `frontend/` e um 
 contexto), o estado fica em `minha-app/.work-state/`: um painel para o projeto todo, e uma task
 pode tocar mais de um repositório, com a mesma branch e um PR em cada. O contexto (CLAUDE.md,
 ADRs, regras) é lido de todos os repositórios, inclusive o de contexto. Os hooks entendem
-`cd backend && npm test` e `git -C frontend push`. O `/dispatch` ainda não funciona nesse modo.
+`cd backend && npm test` e `git -C frontend push`. O `/dispatch` cria, para cada task, um worktree
+em cada repositório que ela toca, em `minha-app/.worktrees/<id>/`.
 
 **O agente para e pergunta** quando o requisito é ambíguo, a solução contraria um ADR, o
 contexto não cobre o caso ou pede estrutura nova, um erro se repete após duas correções
