@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.2.0 — 2026-11-27
+
+### Alterado
+- `/sync` busca as tasks disponíveis no Azure DevOps (abertas, na área do sistema, `ado_area`,
+  atribuídas a mim ou sem responsável), mostra uma tabela e pergunta quais vão ser trabalhadas; só
+  essas entram no `.work-state/`. Atribuir uma task sem responsável só com o sim da pessoa.
+  `/sync atualizar` só atualiza as que já estão no painel (é o que o `/painel` usa); `/sync <ids>`
+  traz essas direto.
+- `/dispatch` funciona no modo projeto e passa a criar os worktrees **dentro** da pasta da sessão
+  (`.worktrees/<id>/<caminho>`; no modo repositório, `.worktrees/<id>`, excluído do git), para
+  funcionar em sandbox que só expõe essa pasta. Antes eles iam para `../<repo>-wt/<id>`.
+- `/dispatch` pula tasks com migration de banco quando outra task ativa também tem.
+
+### Adicionado
+- `ws.mjs worktree add <id>`: cria ou reaproveita um worktree por repositório da task, na branch da
+  task a partir da `base`, e copia os `arquivos_locais`; recusa se a branch estiver em uso na cópia
+  principal, sem deixar a task pela metade. `ws.mjs worktree remove <id>`: apaga os worktrees limpos.
+- `config.json`: `arquivos_locais` por repositório (o `init` preenche com os `.env*` que o git ignora).
+  Se a branch da task não ignora um arquivo copiado, ele é marcado no `info/exclude` do repositório,
+  para um `git add -A` do agente não commitar segredos.
+- Hooks dentro de um worktree gravam `agente=wt-<id>` e deduzem a task pela pasta `.worktrees/<id>`.
+
+### Ainda não
+- Portas por agente e teste no navegador pelos agentes em paralelo.
+
 ## 2.1.0 — 2026-11-27
 
 ### Adicionado

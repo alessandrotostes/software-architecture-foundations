@@ -1,6 +1,6 @@
 {
   "name": "software-architecture-foundations",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Fundamentos de arquitetura (Clean Architecture, GoF, TDD, Sommerville) unidos a um fluxo de trabalho com specs, gate por evidência, agentes paralelos em worktrees e painel em tempo real por repositório.",
   "author": { "name": "Alessandro Tostes" },
   "homepage": "https://github.com/alessandrotostes/software-architecture-foundations",

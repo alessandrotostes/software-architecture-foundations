@@ -106,12 +106,12 @@ e.g. `/software-architecture-foundations:spec`.
 
 | Command | What it does |
 |---|---|
-| `/sync` | Updates the current repository's state from tasks (Azure DevOps via MCP), PRs and CI |
+| `/sync` | Fetches the available Azure DevOps tasks (yours and unassigned, in the system's area), asks which ones to work on, and updates PRs and CI for the ones already on the dashboard |
 | `/painel` | Runs sync and opens the repository's self-refreshing dashboard |
 | `/spec <id>` | Writes the spec with design, testable acceptance criteria and plan; stops for your approval (`/spec aprovar <id>`) |
 | `/implement <id>` | Implements the approved spec in small steps, test-first on logic, then runs the gate |
 | `/gate <id>` | Checks each criterion against evidence and reviews the diff with the architecture checklist, in an isolated context; fixes nothing |
-| `/dispatch <id> <id>` | Starts one headless agent per task, each in its own worktree, all on the same dashboard |
+| `/dispatch <id> <id>` | Starts one headless agent per task, each in its own worktrees (one per repository the task touches, inside the folder), all on the same dashboard; up to `max_agentes` (default 2) |
 
 State lives in `<repository>/.work-state/`, excluded from git only locally
 (`.git/info/exclude`). Agents stop and ask when requirements are ambiguous, a solution would
@@ -126,7 +126,8 @@ repositories (for example `my-app/` with `backend/`, `frontend/` and a context r
 lives in `my-app/.work-state/`: one dashboard for the whole project, and a task can touch more
 than one repository, with the same branch and one PR in each. Context (CLAUDE.md, ADRs, rules) is
 read from every repository, including the context one. The hooks understand
-`cd backend && npm test` and `git -C frontend push`. `/dispatch` does not support this mode yet.
+`cd backend && npm test` and `git -C frontend push`. `/dispatch` creates, for each task, a worktree in
+every repository it touches, under `my-app/.worktrees/<id>/`.
 
 ## License
 Original summary and synthesis, licensed under [CC BY 4.0](LICENSE).

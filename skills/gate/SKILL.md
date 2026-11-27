@@ -13,7 +13,7 @@ Você avalia o resultado sem a influência da conversa que escreveu o código. N
 Leia antes, inteiros: `KIT/regras.md` e `KIT/formato.md`.
 
 1. Estado: `node KIT/ws.mjs dir`; leia `tasks/<id>.md` e `context-summary.md` (se estiver velho segundo `ws.mjs context-status`, refaça como em `regras.md` seção 1).
-2. Diff: `git diff --stat <base>...HEAD` e `git diff <base>...HEAD`, com `<base>` sendo a branch padrão (`git symbolic-ref refs/remotes/origin/HEAD`, ou `main`/`master`/`develop`). Inclua alterações não commitadas, se houver, e aponte que existem. No modo projeto, faça isso em cada repositório de `repos` (`git -C <caminho> diff <base>...HEAD`), com `<base>` vindo de `config.repos`.
+2. Diff: `git diff --stat <base>...HEAD` e `git diff <base>...HEAD`, com `<base>` sendo a branch padrão (`git symbolic-ref refs/remotes/origin/HEAD`, ou `main`/`master`/`develop`). Inclua alterações não commitadas, se houver, e aponte que existem. No modo projeto, faça isso em cada repositório de `repos` (`git -C <caminho> diff <base>...HEAD`), com `<base>` vindo de `config.repos`; os caminhos são relativos à pasta de trabalho (num agente do `/dispatch`, o worktree da task).
 3. Para cada critério de aceite:
    - `teste-automatizado`: localize o teste que cobre o critério (procure pelo id `CA-n` no nome), rode-o e leia a saída. Passa só se o teste existe, roda, passa e de fato verifica o comportamento descrito. Marque `[x]` com `Evidência: <arquivo do teste> — <comando> passou`. Sem teste, ou teste que não verifica o critério: `[ ]` com o motivo.
    - `revisao-humana`: deixe `[ ]`, garanta a pendência `revisao-humana` e escreva o que olhar (arquivos e linhas).

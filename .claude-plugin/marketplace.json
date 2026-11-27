@@ -6,7 +6,7 @@
       "name": "software-architecture-foundations",
       "source": "./",
       "description": "Arquitetura de software + fluxo de specs, gate e agentes com painel por repositório.",
-      "version": "2.1.0"
+      "version": "2.2.0"
     }
   ]
 }

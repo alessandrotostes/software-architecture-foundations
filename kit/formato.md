@@ -41,8 +41,28 @@ node KIT/ws.mjs dir
 
 - `caminho`: relativo à pasta do projeto. É o nome do repositório nas tasks (`repos`, `prs`) e nos eventos (`repo=`).
 - `base`: branch de onde saem as branches das tasks e contra a qual o gate compara o diff. O `init` copia do `origin/HEAD` (ou `main`, `master`, `develop`); se o projeto usa outra base, corrija aqui.
+- `arquivos_locais`: arquivos que o git ignora mas que o repositório precisa para rodar (ex.: `.env`). Um worktree novo vem sem eles; o `ws.mjs worktree add` copia da cópia principal. O `init` preenche com os `.env*` ignorados da raiz do repositório; acrescente outros à mão. Vale também no modo repositório, na raiz do `config.json`.
 - `contexto: true`: repositório só de contexto (ADRs, convenções, regras). Entra no resumo de contexto, não recebe task nem PR. O `init` marca os que começam com `context`; ajuste à mão se precisar.
 - Rodar `init` de novo acrescenta repositórios novos e preserva o resto. Nos dois modos, o remote é gravado sem usuário nem token.
+
+## Worktrees do dispatch
+
+O `/dispatch` roda cada task num agente separado, com um worktree por repositório que ela toca, criado por `node KIT/ws.mjs worktree add <id>`:
+
+```
+minha-app/                       # modo projeto
+  .worktrees/1234/backend/       # worktree do backend na branch da task
+  .worktrees/1234/frontend/      # worktree do frontend na mesma branch
+app/                             # modo repositório
+  .worktrees/1234/               # excluído do git por .git/info/exclude
+```
+
+- Os worktrees ficam **dentro** da pasta da sessão: num sandbox que só expõe essa pasta, um worktree fora dela não existiria.
+- A pasta da task (`.worktrees/<id>/` no modo projeto) tem a mesma estrutura da pasta do projeto, então os caminhos de `repos` valem igual na sessão principal e no agente.
+- A branch sai da `base` do repositório (`origin/<base>` se existir); se a branch da task já existe, ela é reaproveitada. O comando recusa se a branch estiver em uso na cópia principal.
+- Os `arquivos_locais` copiados ficam fora do git mesmo quando a branch da task não os ignora: o comando os acrescenta ao `info/exclude` do repositório (local, nunca ao `.gitignore` do time).
+- `node KIT/ws.mjs worktree remove <id>` apaga os worktrees da task depois do merge. Recusa se houver alteração não commitada; as branches ficam.
+- Dentro de um worktree, os hooks deduzem a task pela branch (ou pela pasta `.worktrees/<id>`) e gravam `agente=wt-<id>`.
 
 ## Regra de escrita
 
@@ -60,7 +80,7 @@ url: https://dev.azure.com/org/projeto/_workitems/edit/1234
 repo: nome-do-repositorio      # modo repositório
 repos: [backend, frontend]     # modo projeto: caminhos de config.repos que a task toca
 branch: feat/1234-filtro-periodo   # modo projeto: o mesmo nome em cada repositório de repos
-worktree: C:/Users/voce/worktrees/nome-do-repositorio-1234
+worktree: /caminho/minha-app/.worktrees/1234   # pasta de trabalho do agente do /dispatch
 fase: implementando   # nova | spec | spec-aprovada | implementando | gate | revisao | teste-manual | pronta-merge | bloqueada | aguardando-decisao
 fase_anterior:        # preenchida ao entrar em aguardando-decisao, para retomar depois
 spec_aprovada: false  # SÓ a pessoa muda para true

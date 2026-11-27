@@ -297,6 +297,137 @@ describe('modo projeto (pasta com vários repositórios)', () => {
   });
 });
 
+describe('worktrees por task (dispatch)', () => {
+  let tmp;
+  let proj;
+  let state;
+  const taskComRepos = (id, repos, branch) =>
+    `---\nid: ${id}\nfase: spec-aprovada\nspec_aprovada: true\n${repos ? `repos: [${repos.join(', ')}]\n` : ''}${branch ? `branch: ${branch}\n` : ''}gate: nao-rodou\n---\n`;
+  const add = (id, cwd = proj) => ws(['worktree', 'add', id], { cwd });
+  const branchOf = (dir) => git(['branch', '--show-current'], dir);
+
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ws-wt-'));
+    proj = path.join(tmp, 'projeto');
+    const backend = path.join(proj, 'backend');
+    makeRepo(backend);
+    write(path.join(backend, '.gitignore'), '.env\nnode_modules/\n');
+    git(['add', '.gitignore'], backend);
+    git(['commit', '-q', '-m', 'gitignore'], backend);
+    write(path.join(backend, '.env'), 'SEGREDO_LOCAL=1\n');
+    write(path.join(backend, '.env.example'), 'SEGREDO_LOCAL=\n');
+    makeRepo(path.join(proj, 'frontend'));
+    makeRepo(path.join(proj, 'contexto-projeto'));
+    assert.equal(ws(['init'], { cwd: proj }).status, 0);
+    state = path.join(proj, '.work-state');
+    write(path.join(state, 'tasks', '555.md'), taskComRepos(555, ['backend', 'frontend'], 'feat/555-relatorio'));
+  });
+
+  afterEach(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+  test('init deve listar em arquivos_locais os .env que o git ignora', () => {
+    const cfg = JSON.parse(fs.readFileSync(path.join(state, 'config.json'), 'utf8'));
+    assert.deepEqual(cfg.repos.find((r) => r.caminho === 'backend').arquivos_locais, ['.env']);
+    assert.equal(cfg.repos.find((r) => r.caminho === 'frontend').arquivos_locais, undefined);
+  });
+
+  test('worktree add deve criar um worktree por repositório da task dentro da pasta do projeto', () => {
+    const r = add('555');
+    assert.equal(r.status, 0, r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.equal(out.cwd, path.join(proj, '.worktrees', '555'));
+    for (const repo of ['backend', 'frontend']) {
+      const wt = path.join(proj, '.worktrees', '555', repo);
+      assert.equal(out.worktrees.find((w) => w.caminho === repo).path, wt);
+      assert.equal(branchOf(wt), 'feat/555-relatorio');
+      assert.equal(branchOf(path.join(proj, repo)), 'main');
+    }
+    assert.equal(fs.readFileSync(path.join(proj, '.worktrees', '555', 'backend', '.env'), 'utf8'), 'SEGREDO_LOCAL=1\n');
+    assert.ok(!fs.existsSync(path.join(proj, '.worktrees', '555', 'frontend', '.env')));
+  });
+
+  test('worktree add deve impedir que o .env copiado entre num commit quando a branch não o ignora', () => {
+    const backend = path.join(proj, 'backend');
+    git(['branch', 'feat/557-antiga', 'HEAD~1'], backend); // branch de antes do .gitignore
+    write(path.join(state, 'tasks', '557.md'), taskComRepos(557, ['backend'], 'feat/557-antiga'));
+    assert.equal(add('557').status, 0);
+    const wt = path.join(proj, '.worktrees', '557', 'backend');
+    assert.ok(fs.existsSync(path.join(wt, '.env')));
+    assert.equal(git(['status', '--porcelain'], wt), '', '.env copiado não pode aparecer para git add');
+    assert.equal(ws(['worktree', 'remove', '557'], { cwd: proj }).status, 0);
+  });
+
+  test('worktree add de novo deve reaproveitar os worktrees da task', () => {
+    assert.equal(add('555').status, 0);
+    const r = add('555');
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(JSON.parse(r.stdout).worktrees.every((w) => w.estado === 'reaproveitado'));
+  });
+
+  test('worktree add deve usar a branch da task quando ela já existe', () => {
+    const frontend = path.join(proj, 'frontend');
+    git(['checkout', '-q', '-b', 'feat/555-relatorio'], frontend);
+    git(['commit', '-q', '--allow-empty', '-m', 'trabalho anterior'], frontend);
+    const ponta = git(['rev-parse', 'HEAD'], frontend);
+    git(['checkout', '-q', 'main'], frontend);
+    assert.equal(add('555').status, 0);
+    assert.equal(git(['rev-parse', 'HEAD'], path.join(proj, '.worktrees', '555', 'frontend')), ponta);
+  });
+
+  test('worktree add deve recusar quando a branch da task está em uso na cópia principal', () => {
+    git(['checkout', '-q', '-b', 'feat/555-relatorio'], path.join(proj, 'backend'));
+    const r = add('555');
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /backend/);
+    assert.match(r.stderr, /feat\/555-relatorio/);
+    assert.ok(!fs.existsSync(path.join(proj, '.worktrees', '555', 'frontend')), 'não deve criar worktree pela metade');
+  });
+
+  test('worktree add deve recusar task sem repos no modo projeto', () => {
+    write(path.join(state, 'tasks', '556.md'), taskComRepos(556, null, 'feat/556-x'));
+    const r = add('556');
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /repos/);
+  });
+
+  test('hook dentro do worktree deve gravar a task, o agente e o repositório do worktree', () => {
+    assert.equal(add('555').status, 0);
+    const wt = path.join(proj, '.worktrees', '555', 'backend');
+    ws(['hook'], { cwd: wt, input: { cwd: wt, ...bashOk('npm test') } });
+    assert.match(readEvents(state).at(-1), /task=555 agente=wt-555 evento=teste resultado=ok repo=backend$/);
+  });
+
+  test('worktree remove deve apagar os worktrees limpos e manter as branches', () => {
+    assert.equal(add('555').status, 0);
+    const r = ws(['worktree', 'remove', '555'], { cwd: proj });
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(!fs.existsSync(path.join(proj, '.worktrees', '555')));
+    assert.equal(git(['branch', '--list', 'feat/555-relatorio'], path.join(proj, 'backend')), 'feat/555-relatorio');
+  });
+
+  test('worktree remove deve recusar quando há alteração não commitada', () => {
+    assert.equal(add('555').status, 0);
+    write(path.join(proj, '.worktrees', '555', 'backend', 'novo.ts'), 'export {}');
+    const r = ws(['worktree', 'remove', '555'], { cwd: proj });
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /backend/);
+    assert.ok(fs.existsSync(path.join(proj, '.worktrees', '555', 'backend', 'novo.ts')));
+  });
+
+  test('worktree add no modo repositório deve criar o worktree dentro do repositório, fora do git status', () => {
+    const repo = path.join(tmp, 'app');
+    makeRepo(repo);
+    assert.equal(ws(['init'], { cwd: repo }).status, 0);
+    write(path.join(repo, '.work-state', 'tasks', '777.md'), taskComRepos(777, null, 'feat/777-x'));
+    const r = add('777', repo);
+    assert.equal(r.status, 0, r.stderr);
+    const wt = path.join(repo, '.worktrees', '777');
+    assert.equal(JSON.parse(r.stdout).cwd, wt);
+    assert.equal(branchOf(wt), 'feat/777-x');
+    assert.equal(git(['status', '--porcelain'], repo), '');
+  });
+});
+
 test('hooks.json deve encaminhar PostToolUseFailure de Bash e PowerShell para o ws.mjs hook', () => {
   const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks', 'hooks.json'), 'utf8'));
   const entradas = cfg.hooks.PostToolUseFailure || [];
