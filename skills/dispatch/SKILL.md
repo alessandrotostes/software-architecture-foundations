@@ -10,6 +10,8 @@ Tasks: $ARGUMENTS
 
 Leia antes: `KIT/regras.md` e `KIT/formato.md`.
 
+**O modo projeto ainda não tem dispatch.** Se `config.json` tiver `modo: projeto`, não dispare nada: diga que o dispatch com vários repositórios ainda não existe e sugira rodar `/implement <id>` nesta sessão, uma task por vez.
+
 Regra que torna isso seguro: **uma task, um worktree, um agente**, e eles só se comunicam pelo arquivo de estado.
 
 1. `STATE=$(node KIT/ws.mjs dir)` e leia `config.json` (`max_agentes`, padrão 2). A raiz do repositório principal é a pasta-mãe de `STATE`.

@@ -28,14 +28,15 @@ Como resolver os encontros entre as duas:
 - **Test-first:** segue a SAF (princípio 9). Critério com regra de negócio ou lógica com decisão: teste antes do código, nomeado com o id do critério (`it('CA-2: deve … quando …')`). Cola, configuração e layout sem lógica: teste de integração/e2e do fluxo ou nenhum, e o motivo vai no `## Log`.
 - **Proporcionalidade:** a SAF diz para não aplicar regra que não reduz custo de mudança. Ao pular uma, escreva o porquê no `## Log`: o gate cobra a justificativa, não a regra.
 
-## 1. Contexto vivo do repositório
+## 1. Contexto vivo do projeto
 
 Antes de qualquer spec, implementação ou gate:
 
 1. Rode `node KIT/ws.mjs context-status`.
 2. Se `desatualizado` for `true`, refaça `.work-state/context-summary.md`:
-   - leia cada arquivo listado em `fontes`, nesta ordem: `CLAUDE.md` da raiz e de cada subprojeto; pasta de contexto (`context/`, `docs/`, `adr/` ou equivalente): ADRs, convenções, padrões de API, regras de domínio, glossário; configurações (lint, tsconfig, scripts do `package.json`, estrutura de pastas);
-   - escreva uma regra por linha, agrupada por escopo (`raiz`, `frontend/`, `backend/`...), cada uma com o arquivo de origem: `- Datas sempre em UTC na API (fonte: context/adr/0003-datas.md)`;
+   - leia cada arquivo listado em `fontes`, nesta ordem: `CLAUDE.md` da raiz e de cada subprojeto (no modo projeto, de cada repositório, incluindo o de contexto); pasta de contexto (`context/`, `.context/`, `docs/`, `adr/`, regras de agente como `.claude/rules/`, ou equivalente): ADRs, convenções, padrões de API, regras de domínio, glossário; configurações (lint, tsconfig, scripts do `package.json`, estrutura de pastas);
+   - se a pasta de contexto tem índice próprio (`CONTEXT.md`, `README.md`, `activeContext.md` ou similar) e muitos arquivos, comece pelo índice e siga o roteiro dele: leia inteiros os ADRs aceitos, as convenções, as armadilhas conhecidas e o glossário; o resto (runbooks, domínio, diagramas) entra no resumo como ponteiro (`- Pagamentos: ver context/dominio/pagamentos.md`) e é lido quando a task tocar o tema;
+   - escreva uma regra por linha, agrupada por escopo (`raiz`, `frontend/`, `backend/`...; no modo projeto, o `caminho` de cada repositório), cada uma com o arquivo de origem: `- Datas sempre em UTC na API (fonte: context/adr/0003-datas.md)`;
    - liste no fim, em `## Conflitos`, qualquer par de regras que se contradiz;
    - se nada mudou de fato, ainda assim regrave o arquivo para atualizar a data.
 3. Leia `.work-state/context-summary.md` e trate cada regra como **obrigatória**.

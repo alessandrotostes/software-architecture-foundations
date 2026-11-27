@@ -17,7 +17,7 @@ Caso contrário:
 1. `node KIT/ws.mjs dir`; se não existir `.work-state/`, rode `ws.mjs init`.
 2. Contexto vivo: siga a seção 1 de `regras.md` (context-status, refazer o resumo se velho, ler o resumo).
 3. Leia a task no Azure DevOps (MCP): título, descrição, critérios já escritos, comentários, links para mãe e filhas. Sem MCP, peça a descrição à pessoa.
-4. Explore o código afetado **sem alterar nada**. Identifique o subprojeto (front, back) e as regras de contexto que valem para ele.
+4. Explore o código afetado **sem alterar nada**. Identifique os repositórios ou subprojetos afetados (front, back) e as regras de contexto que valem para cada um. No modo projeto, grave em `repos` os caminhos de `config.repos` que a task toca.
 5. Arquitetura: leia `SAF/SKILL.md` (fluxo A) e `SAF/references/spec-driven.md`; se a stack for TypeScript, Node ou React, também `SAF/references/typescript-react.md`; para requisitos não funcionais, `SAF/references/software-engineering.md`. Com isso:
    - valide o requisito (válido, consistente, completo, realista, verificável); critério vago ("rápido", "seguro") vira versão mensurável ou pergunta;
    - separe requisitos funcionais e não funcionais; identifique atores, núcleo (entidades e casos de uso), portas e fronteiras **usando a estrutura que o projeto já tem**.
@@ -29,7 +29,7 @@ Caso contrário:
    - `## Critérios de aceite`: ids `CA-1`, `CA-2`..., cada um observável e testável (preferir Dado/quando/então), com `Verificação: teste-automatizado | revisao-humana | teste-navegador`. Para revisão humana, diga o que olhar; para navegador, o passo a passo. Os critérios automatizados são a lista de testes da implementação;
    - `## Riscos`;
    - `## Plano em passos pequenos`: passos que cabem num commit, cada um dizendo qual critério avança e se é lógica (test-first) ou cola/layout (teste de integração ou nenhum);
-   - `branch: feat/<id>-<slug-curto>` se ainda não houver.
+   - `branch: feat/<id>-<slug-curto>` se ainda não houver (no modo projeto, o mesmo nome vale para cada repositório de `repos`).
 8. Marque `fase: spec`, `spec_aprovada: false`, `gate: nao-rodou`, `atualizado_em`.
 9. Rode `ws.mjs event evento=spec-criada task=<id> ca_total=<n>`.
 10. Pare. Mostre os critérios de aceite e os pontos de risco e diga: para aprovar, edite `spec_aprovada: true` ou rode `/spec aprovar <id>`. Nunca aprove sozinho.

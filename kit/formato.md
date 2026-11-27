@@ -1,6 +1,11 @@
-# Formato do estado por repositório
+# Formato do estado
 
-Todo o estado vive em `<raiz-do-repositorio-principal>/.work-state/`, excluído do git por `.git/info/exclude` (nunca pelo `.gitignore` do time). Worktrees usam o mesmo `.work-state/` da raiz principal: descubra o caminho com
+Todo o estado vive numa pasta `.work-state/`, em um de dois modos, que o `ws.mjs init` escolhe sozinho:
+
+- **Modo repositório:** a pasta atual é um repositório git. O estado fica em `<raiz-do-repositorio-principal>/.work-state/`, excluído do git por `.git/info/exclude` (nunca pelo `.gitignore` do time).
+- **Modo projeto:** a pasta atual não é um repositório git, mas tem repositórios dentro (por exemplo `minha-app/` com `backend/`, `frontend/` e um repositório de contexto). O estado fica em `<pasta-do-projeto>/.work-state/`: um painel para o projeto todo, e uma task pode tocar mais de um repositório. A pasta do projeto não é versionada, então nada vai para o time.
+
+O `ws.mjs` acha o estado subindo a partir da pasta atual, como o git acha o `.git`: funciona na raiz do projeto, dentro de qualquer repositório dele e em worktrees, que gravam no estado do repositório principal. Descubra o caminho com
 
 ```
 node KIT/ws.mjs dir
@@ -8,13 +13,36 @@ node KIT/ws.mjs dir
 
 ```
 .work-state/
-  config.json           # repo, ado_url, ado_projeto, ado_area, max_agentes
+  config.json           # repositório: repo, remote, ado_*, max_agentes · projeto: modo, projeto, repos, ado_*, max_agentes
   tasks/<id>.md         # estado e spec de cada task (frontmatter + corpo)
   events.log            # um evento por linha (só acrescentar, nunca reescrever)
   context-summary.md    # regras do contexto vivo, cada uma com o arquivo de origem
   index.json            # GERADO pelo ws.mjs render: não editar à mão
   dashboard.html        # GERADO pelo ws.mjs render: não editar à mão
 ```
+
+## config.json no modo projeto
+
+```json
+{
+  "modo": "projeto",
+  "projeto": "minha-app",
+  "repos": [
+    { "caminho": "backend", "remote": "https://example.com/org/backend.git", "base": "main" },
+    { "caminho": "context", "remote": "https://example.com/org/context.git", "base": "main", "contexto": true },
+    { "caminho": "frontend", "remote": "https://example.com/org/frontend.git", "base": "main" }
+  ],
+  "ado_url": "",
+  "ado_projeto": "",
+  "ado_area": "",
+  "max_agentes": 2
+}
+```
+
+- `caminho`: relativo à pasta do projeto. É o nome do repositório nas tasks (`repos`, `prs`) e nos eventos (`repo=`).
+- `base`: branch de onde saem as branches das tasks e contra a qual o gate compara o diff. O `init` copia do `origin/HEAD` (ou `main`, `master`, `develop`); se o projeto usa outra base, corrija aqui.
+- `contexto: true`: repositório só de contexto (ADRs, convenções, regras). Entra no resumo de contexto, não recebe task nem PR. O `init` marca os que começam com `context`; ajuste à mão se precisar.
+- Rodar `init` de novo acrescenta repositórios novos e preserva o resto. Nos dois modos, o remote é gravado sem usuário nem token.
 
 ## Regra de escrita
 
@@ -29,8 +57,9 @@ node KIT/ws.mjs dir
 id: 1234
 titulo: Filtro por período na tela de relatórios
 url: https://dev.azure.com/org/projeto/_workitems/edit/1234
-repo: nome-do-repositorio
-branch: feat/1234-filtro-periodo
+repo: nome-do-repositorio      # modo repositório
+repos: [backend, frontend]     # modo projeto: caminhos de config.repos que a task toca
+branch: feat/1234-filtro-periodo   # modo projeto: o mesmo nome em cada repositório de repos
 worktree: C:/Users/voce/worktrees/nome-do-repositorio-1234
 fase: implementando   # nova | spec | spec-aprovada | implementando | gate | revisao | teste-manual | pronta-merge | bloqueada | aguardando-decisao
 fase_anterior:        # preenchida ao entrar em aguardando-decisao, para retomar depois
@@ -39,7 +68,8 @@ agente: wt-1234
 iniciado_em:
 pr: 87
 pr_url:
-ci: pendente          # passando | falhando | pendente | sem-pr
+prs: [backend#87, frontend#45]   # modo projeto: um PR por repositório
+ci: pendente          # passando | falhando | pendente | sem-pr (modo projeto: o pior entre os PRs)
 gate: nao-rodou       # nao-rodou | parcial | passou | falhou
 mae:                  # id da task mãe, se for filha
 filhas: []            # ids das filhas
@@ -83,4 +113,4 @@ Quando a pessoa responde, ela escreve abaixo do bloco uma linha `- Resposta: ...
 node KIT/ws.mjs event evento=<nome> [task=<id>] [resultado=<x>] [chave=valor ...]
 ```
 
-`task` e `agente` são deduzidos da branch e do worktree quando omitidos. O comando também regera o painel. Eventos usados: `sync`, `spec-criada`, `spec-aprovada`, `passo-concluido`, `teste`, `criterio-cumprido`, `gate`, `commit`, `push`, `pr-aberto`, `decisao-necessaria`, `trabalho-novo`, `retomada`, `agente-iniciado`, `agente-parado`, `agente-finalizado`. Os hooks já gravam `commit`, `push`, `pr-aberto`, `teste`, `task-atualizada`, `agente-parado` e `subagente-finalizado` sozinhos. O `teste` sai com `resultado=ok`, `falhou` ou `interrompido`; commit, push e PR cujo comando falhou não são gravados.
+`task` e `agente` são deduzidos da branch e do worktree quando omitidos. O comando também regera o painel. Eventos usados: `sync`, `spec-criada`, `spec-aprovada`, `passo-concluido`, `teste`, `criterio-cumprido`, `gate`, `commit`, `push`, `pr-aberto`, `decisao-necessaria`, `trabalho-novo`, `retomada`, `agente-iniciado`, `agente-parado`, `agente-finalizado`. Os hooks já gravam `commit`, `push`, `pr-aberto`, `teste`, `task-atualizada`, `agente-parado` e `subagente-finalizado` sozinhos. O `teste` sai com `resultado=ok`, `falhou` ou `interrompido`; commit, push e PR cujo comando falhou não são gravados. No modo projeto, os hooks entendem `cd <repo> && ...` e `git -C <repo> ...`, deduzem a task pela branch daquele repositório e acrescentam `repo=<caminho>` em `commit`, `push`, `pr-aberto` e `teste`.

@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.1.0 — 2026-11-27
+
+### Adicionado
+- **Modo projeto:** o fluxo funciona numa pasta que não é repositório git mas contém repositórios
+  (ex.: `backend/`, `frontend/` e um repositório de contexto). O `.work-state/` fica na pasta do
+  projeto, com um painel só; o `config.json` lista os repositórios (`repos`, com `base` e
+  `contexto`) e uma task pode tocar vários (`repos`, `prs`). `init` de novo acrescenta repositórios.
+- O `ws.mjs` acha o estado subindo pelas pastas, como o git acha o `.git`: funciona na raiz do
+  projeto, dentro de um repositório dele e em worktrees criados fora da pasta.
+- Hooks entendem `cd <repo> && ...` e `git -C <repo> ...`: deduzem a task pela branch daquele
+  repositório, gravam `repo=<caminho>` e aplicam o bloqueio de push ao repositório certo. Na raiz do
+  projeto, a task é a única branch que tem arquivo de task.
+- Contexto: lê pastas ocultas (`.context/`) e regras de agente (`.claude/rules/`, `.kiro/steering/`);
+  ignora changelogs, planos, arquivo morto e worktrees; limite de fontes de 400 para 1000. Pasta de
+  contexto grande com índice próprio é lida a partir do índice (`kit/regras.md`).
+
+### Corrigido
+- `git -C <pasta> push` passava pelo bloqueio de push sem gate, e `git -C <pasta> commit` não era
+  registrado.
+- O `config.json` guardava o remote com usuário e token quando a URL os tinha.
+
+### Documentação
+- README: como usar o plugin com o Claude Code dentro de um sandbox que só expõe a pasta da sessão
+  (instalar de marketplace git, abrir na raiz do projeto, `node` visível) e como testar uma branch.
+
+### Ainda não
+- `/dispatch` no modo projeto (worktree por repositório): recusa e sugere `/implement`.
+
 ## 2.0.1 — 2026-11-27
 
 ### Corrigido
