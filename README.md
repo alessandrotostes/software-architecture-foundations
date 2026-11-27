@@ -49,7 +49,19 @@ AGENTS.md                         ← versão enxuta da skill de arquitetura par
 ```
 
 Para testar a partir de uma cópia local, troque o primeiro comando por
-`/plugin marketplace add <caminho-da-pasta>`. Requer Node.js (para o `kit/ws.mjs`) e git.
+`/plugin marketplace add <caminho-da-pasta>`. Para testar uma branch, use
+`/plugin marketplace add https://github.com/alessandrotostes/software-architecture-foundations.git#<branch>`.
+Requer Node.js (para o `kit/ws.mjs`) e git.
+
+**Claude Code dentro de sandbox** (ai-jail, bubblewrap, contêiner) que só expõe a pasta onde a
+sessão foi aberta e o `~/.claude`:
+- Instale de um marketplace git (GitHub ou URL), não de uma pasta local. Do git, o plugin é copiado
+  para `~/.claude/plugins`, que o sandbox expõe; de uma pasta local, ele é lido da própria pasta, que
+  o sandbox esconde, e o `/plugin` mostra "couldn't load".
+- Abra a sessão na raiz do projeto (no modo projeto, a pasta que contém os repositórios), para que o
+  `.work-state/` e todos os repositórios fiquem visíveis.
+- Os hooks rodam `node`: ele precisa estar num caminho que o sandbox expõe (por exemplo `/usr/bin`).
+  Um Node instalado só na home (nvm) fica escondido e os hooks, inclusive o bloqueio de push, não rodam.
 
 ### Outros agentes: só a skill de arquitetura
 

@@ -53,7 +53,19 @@ AGENTS.md                         ← lean version of the architecture skill for
 ```
 
 To try a local copy, replace the first command with `/plugin marketplace add <folder-path>`.
+To try a branch, use
+`/plugin marketplace add https://github.com/alessandrotostes/software-architecture-foundations.git#<branch>`.
 Requires Node.js (for `kit/ws.mjs`) and git.
+
+**Claude Code inside a sandbox** (ai-jail, bubblewrap, a container) that only exposes the folder the
+session was opened in plus `~/.claude`:
+- Install from a git marketplace (GitHub or URL), not from a local folder. From git, the plugin is
+  copied into `~/.claude/plugins`, which the sandbox exposes; from a local folder it is read in place,
+  the sandbox hides that folder, and `/plugin` shows "couldn't load".
+- Open the session at the project root (in project mode, the folder that holds the repositories) so
+  `.work-state/` and every repository are visible.
+- The hooks run `node`, so it must live on a path the sandbox exposes (e.g. `/usr/bin`). A Node
+  installed only under your home (nvm) is hidden and the hooks, including the push block, do not run.
 
 ### Other agents: the architecture skill only
 

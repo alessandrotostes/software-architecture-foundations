@@ -21,6 +21,10 @@
   registrado.
 - O `config.json` guardava o remote com usuário e token quando a URL os tinha.
 
+### Documentação
+- README: como usar o plugin com o Claude Code dentro de um sandbox que só expõe a pasta da sessão
+  (instalar de marketplace git, abrir na raiz do projeto, `node` visível) e como testar uma branch.
+
 ### Ainda não
 - `/dispatch` no modo projeto (worktree por repositório): recusa e sugere `/implement`.
 
