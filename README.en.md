@@ -109,6 +109,13 @@ up. The hooks do nothing in repositories without `.work-state/`; elsewhere they 
 the dashboard and block `git push` while the current branch's task gate has not passed
 (set `WS_ALLOW_PUSH=1` to allow once).
 
+**Project mode.** If you open Claude Code in a folder that is not a git repository but contains
+repositories (for example `my-app/` with `backend/`, `frontend/` and a context repository), state
+lives in `my-app/.work-state/`: one dashboard for the whole project, and a task can touch more
+than one repository, with the same branch and one PR in each. Context (CLAUDE.md, ADRs, rules) is
+read from every repository, including the context one. The hooks understand
+`cd backend && npm test` and `git -C frontend push`. `/dispatch` does not support this mode yet.
+
 ## License
 Original summary and synthesis, licensed under [CC BY 4.0](LICENSE).
 The referenced books belong to their authors and publishers; this material does not reproduce

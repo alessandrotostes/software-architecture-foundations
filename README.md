@@ -111,6 +111,13 @@ Fluxo do dia: `/painel` de manhã → `/spec` → você aprova → `/dispatch` �
 (`.git/info/exclude`), então nada pessoal vai para o repositório do time. Os worktrees gravam
 no `.work-state/` do repositório principal. Formato em [`kit/formato.md`](kit/formato.md).
 
+**Modo projeto.** Se você abre o Claude Code numa pasta que não é repositório git, mas que tem
+repositórios dentro (por exemplo `minha-app/` com `backend/`, `frontend/` e um repositório de
+contexto), o estado fica em `minha-app/.work-state/`: um painel para o projeto todo, e uma task
+pode tocar mais de um repositório, com a mesma branch e um PR em cada. O contexto (CLAUDE.md,
+ADRs, regras) é lido de todos os repositórios, inclusive o de contexto. Os hooks entendem
+`cd backend && npm test` e `git -C frontend push`. O `/dispatch` ainda não funciona nesse modo.
+
 **O agente para e pergunta** quando o requisito é ambíguo, a solução contraria um ADR, o
 contexto não cobre o caso ou pede estrutura nova, um erro se repete após duas correções
 diferentes, ou aparece mudança de contrato, migration, dependência nova ou trabalho fora do

@@ -13,13 +13,13 @@ Você avalia o resultado sem a influência da conversa que escreveu o código. N
 Leia antes, inteiros: `KIT/regras.md` e `KIT/formato.md`.
 
 1. Estado: `node KIT/ws.mjs dir`; leia `tasks/<id>.md` e `context-summary.md` (se estiver velho segundo `ws.mjs context-status`, refaça como em `regras.md` seção 1).
-2. Diff: `git diff --stat <base>...HEAD` e `git diff <base>...HEAD`, com `<base>` sendo a branch padrão (`git symbolic-ref refs/remotes/origin/HEAD`, ou `main`/`master`/`develop`). Inclua alterações não commitadas, se houver, e aponte que existem.
+2. Diff: `git diff --stat <base>...HEAD` e `git diff <base>...HEAD`, com `<base>` sendo a branch padrão (`git symbolic-ref refs/remotes/origin/HEAD`, ou `main`/`master`/`develop`). Inclua alterações não commitadas, se houver, e aponte que existem. No modo projeto, faça isso em cada repositório de `repos` (`git -C <caminho> diff <base>...HEAD`), com `<base>` vindo de `config.repos`.
 3. Para cada critério de aceite:
    - `teste-automatizado`: localize o teste que cobre o critério (procure pelo id `CA-n` no nome), rode-o e leia a saída. Passa só se o teste existe, roda, passa e de fato verifica o comportamento descrito. Marque `[x]` com `Evidência: <arquivo do teste> — <comando> passou`. Sem teste, ou teste que não verifica o critério: `[ ]` com o motivo.
    - `revisao-humana`: deixe `[ ]`, garanta a pendência `revisao-humana` e escreva o que olhar (arquivos e linhas).
    - `teste-navegador`: deixe `[ ]`, garanta a pendência `teste-navegador` e escreva o passo a passo.
    Não aceite afirmação do log ou do agente como evidência.
-4. Rode também lint, typecheck e a suíte de testes do subprojeto afetado. Qualquer falha reprova o gate.
+4. Rode também lint, typecheck e a suíte de testes do subprojeto afetado (no modo projeto, de cada repositório de `repos`, rodando dentro dele). Qualquer falha reprova o gate.
 5. Escopo: compare o diff com `## Escopo` e `## Fora de escopo`. Liste toda alteração fora dele, toda dependência nova, alteração de contrato de API ou migration não prevista.
 6. Contexto: para cada regra em `## Regras do contexto que se aplicam` (e as do resumo que valem para os arquivos alterados), diga se o diff respeita, com o trecho que mostra isso. Violação reprova o gate.
 6b. Arquitetura: revise o diff com `SAF/references/review-checklist.md` (perguntas na ordem dele, tabela cheiro → remédio, formato de achado com severidade). Use `SAF/references/typescript-react.md` se a stack for essa. Avalie só o que o diff introduz ou piora, não o legado em volta. Classifique:
