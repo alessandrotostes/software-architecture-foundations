@@ -1,57 +1,71 @@
-# Skill: software-architecture-foundations
+# software-architecture-foundations
 
 [🇧🇷 Português](README.md) · 🇺🇸 English
 
-Software architecture fundamentals for AI coding agents, distilled from four classic books:
+Two things in one package for AI coding agents:
 
-- **Clean Architecture** — Robert C. Martin
-- **Design Patterns** — Gamma, Helm, Johnson, Vlissides (GoF)
-- **Test-Driven Development: By Example** — Kent Beck
-- **Software Engineering, 9th ed.** — Ian Sommerville
+1. **The architecture skill**: software architecture fundamentals distilled from four classic
+   books, with hands-on guidance for **TypeScript, Node.js and React** and integration with
+   **Spec-Driven Development**:
+   - **Clean Architecture** by Robert C. Martin
+   - **Design Patterns** by Gamma, Helm, Johnson and Vlissides (GoF)
+   - **Test-Driven Development: By Example** by Kent Beck
+   - **Software Engineering, 9th ed.** by Ian Sommerville
+2. **The agent workflow** (a Claude Code plugin): spec with acceptance criteria → your approval →
+   implementation with TDD → a gate that accepts only evidence → review and merge. Several
+   agents run in parallel, each in its own worktree, and a per-repository dashboard shows
+   live what is missing in each task.
 
-It also covers hands-on application in **TypeScript, Node.js and React**, and integration with
-**Spec-Driven Development** and **Context Engineering** (specs, ADRs and living documentation).
+The architecture skill says **how** to design, test and review. The workflow says **when** and
+**under what control**: phase, approval, evidence, stopping for a human decision. Where they
+meet, this order applies: your decision > the project's ADRs and conventions > the skill's
+principles (see [`kit/regras.md`](kit/regras.md), section 0).
 
-> The skill content is written in Brazilian Portuguese. Agents read it regardless of the
-> language you prompt in, and the trigger description includes English keywords.
-
-It follows the open **Agent Skills** format (`SKILL.md` + `references/`), supported by
-Claude Code, OpenAI Codex, Cursor, GitHub Copilot, Gemini CLI, Windsurf, Cline, OpenCode,
-Goose, Roo Code and others. For tools without skill support, use `AGENTS.md`.
+> The content is written in Brazilian Portuguese. Agents read it regardless of the language you
+> prompt in, and the trigger description includes English keywords.
 
 ```
-software-architecture-foundations/
-├── SKILL.md                      ← core rules + workflow (loaded when the skill activates)
-└── references/                   ← loaded on demand
-    ├── clean-architecture.md
-    ├── design-patterns.md
-    ├── tdd.md
-    ├── software-engineering.md
-    ├── review-checklist.md
-    ├── typescript-react.md       ← ports, composition, boundaries and testing in TS/React
-    └── spec-driven.md            ← specs, acceptance criteria, ADRs and living docs
-AGENTS.md                         ← lean “always-on” version for any agent
+.claude-plugin/
+  plugin.json                     ← plugin manifest
+  marketplace.json                ← lets you install straight from this repository
+skills/
+  software-architecture-foundations/   ← the architecture skill (open Agent Skills format)
+    SKILL.md
+    references/                   ← clean-architecture, design-patterns, tdd, software-engineering,
+                                    review-checklist, typescript-react, spec-driven
+  spec/  implement/  gate/  dispatch/  sync/  painel/   ← the workflow (Claude Code)
+kit/
+  regras.md                       ← shared rules: precedence, living context, when to stop, new work
+  formato.md                      ← per-task state format
+  ws.mjs                          ← dependency-free script: state, events, dashboard, server, hooks
+  dashboard.template.html         ← dashboard
+hooks/hooks.json                  ← logs events and blocks push without a passing gate
+AGENTS.md                         ← lean version of the architecture skill for any agent
 ```
-
-## What the agent gets
-
-- **12 always-on principles** — dependency rule, policy vs. detail, SOLID, composition over
-  inheritance, test-first where there is logic, patterns only when variation is real.
-- **A workflow** — understand and decide → TDD on domain logic → refactor → pre-delivery checklist.
-- **A code review checklist** with a "smell → cause → remedy" table, including multi-tenant
-  data isolation and resource-level authorization.
-- **Stack guidance** for TypeScript/Node/React: ports as interfaces, a single composition root,
-  boundaries enforced by dependency-cruiser / eslint, Humble Object with React hooks.
-- **Spec-Driven flow** — acceptance criteria become the test list; architectural decisions become ADRs.
 
 ## Installation
 
-### Option 1 — Universal installer
-```bash
-npx skills add alessandrotostes/software-architecture-foundations
+### Claude Code: full plugin (architecture + workflow)
+
+```
+/plugin marketplace add alessandrotostes/software-architecture-foundations
+/plugin install software-architecture-foundations@alessandrotostes
 ```
 
-### Option 2 — Copy the folder
+To try a local copy, replace the first command with `/plugin marketplace add <folder-path>`.
+Requires Node.js (for `kit/ws.mjs`) and git.
+
+### Other agents: the architecture skill only
+
+The workflow relies on Claude Code features (hooks, `context: fork`, `claude -p`). The
+architecture skill works in any agent that supports Agent Skills.
+
+**Universal installer**, in your project:
+```bash
+npx skills add alessandrotostes/software-architecture-foundations --skill software-architecture-foundations
+```
+
+**Copy the folder** `skills/software-architecture-foundations/`:
 
 | Tool | Project | Global |
 |---|---|---|
@@ -62,17 +76,38 @@ npx skills add alessandrotostes/software-architecture-foundations
 | Continue | `.continue/skills/…` | `~/.continue/skills/…` |
 | Roo Code | `.roo/skills/…` | `~/.roo/skills/…` |
 
-### Option 3 — Tools without skill support
-Copy `AGENTS.md` to the project root (or into `CLAUDE.md`, `GEMINI.md`,
-`.github/copilot-instructions.md`, `.cursor/rules/`, `.windsurfrules`). It is intentionally
-lean so it doesn't weigh on every session's context; keep the skill folder in the project so
-the full workflow and references can be read on demand.
+**Tools without skill support:** copy `AGENTS.md` to the project root (or into `CLAUDE.md`,
+`GEMINI.md`, `.github/copilot-instructions.md`, `.cursor/rules/`, `.windsurfrules`).
 
-## Usage examples
+## Using the architecture skill
+
+It activates on its own when a task involves designing, implementing, refactoring or reviewing
+code. You can also ask:
 - "Use the software-architecture-foundations skill to review this PR."
 - "Propose this module's architecture following Clean Architecture and TDD."
 - "Should this type-based `switch` become a design pattern? Which one and why?"
-- "Implement `specs/coupons/spec.md` following the skill."
+
+## Using the workflow
+
+Commands run only when you call them. Inside the plugin they also answer to their full name,
+e.g. `/software-architecture-foundations:spec`.
+
+| Command | What it does |
+|---|---|
+| `/sync` | Updates the current repository's state from tasks (Azure DevOps via MCP), PRs and CI |
+| `/painel` | Runs sync and opens the repository's self-refreshing dashboard |
+| `/spec <id>` | Writes the spec with design, testable acceptance criteria and plan; stops for your approval (`/spec aprovar <id>`) |
+| `/implement <id>` | Implements the approved spec in small steps, test-first on logic, then runs the gate |
+| `/gate <id>` | Checks each criterion against evidence and reviews the diff with the architecture checklist, in an isolated context; fixes nothing |
+| `/dispatch <id> <id>` | Starts one headless agent per task, each in its own worktree, all on the same dashboard |
+
+State lives in `<repository>/.work-state/`, excluded from git only locally
+(`.git/info/exclude`). Agents stop and ask when requirements are ambiguous, a solution would
+break an ADR, context is missing or calls for new structure, an error repeats after two
+different fixes, or a contract change, migration, new dependency or out-of-scope work comes
+up. The hooks do nothing in repositories without `.work-state/`; elsewhere they log events to
+the dashboard and block `git push` while the current branch's task gate has not passed
+(set `WS_ALLOW_PUSH=1` to allow once).
 
 ## License
 Original summary and synthesis, licensed under [CC BY 4.0](LICENSE).

@@ -4,7 +4,7 @@ description: Fundamentos de arquitetura e design de software destilados de Clean
 license: CC-BY-4.0
 metadata:
   author: Alessandro Tostes
-  version: "1.1.0"
+  version: "2.0.0"
 ---
 
 # Fundamentos de Arquitetura de Software
