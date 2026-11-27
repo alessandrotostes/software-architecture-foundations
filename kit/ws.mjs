@@ -9,7 +9,7 @@
 //   render                   regera index.json e dashboard.html a partir de tasks/*.md
 //   serve [porta]            servidor local (127.0.0.1) para o painel em tempo real
 //   context-status           lista as fontes de contexto e diz se o context-summary.md está velho
-//   hook                     entrada de hook (Stop, SubagentStop, PostToolUse): lê JSON do stdin
+//   hook                     entrada de hook (Stop, SubagentStop, PostToolUse, PostToolUseFailure): lê JSON do stdin
 //   guard                    hook PreToolUse: bloqueia git push se o gate da task não passou
 
 import fs from 'node:fs';
@@ -369,6 +369,16 @@ const BASH_EVENTS = [
   [/\b(npm|pnpm|yarn|bun)\s+(run\s+)?test\b|\bnpx\s+(jest|vitest|playwright)\b|\b(jest|vitest|pytest|dotnet\s+test|go\s+test|cargo\s+test|mvn\s+test|gradle\w*\s+test)\b/, 'teste'],
 ];
 
+// O Claude Code dispara PostToolUse quando o comando sai com 0 (a resposta não traz exitCode)
+// e PostToolUseFailure quando sai com outro código (`error: "Exit code N"`).
+function testResult(name, input) {
+  const resp = input.tool_response && typeof input.tool_response === 'object' ? input.tool_response : {};
+  const code = resp.exitCode ?? resp.exit_code ?? resp.returnCode;
+  if (code !== undefined) return code === 0 ? 'ok' : 'falhou';
+  if (name === 'PostToolUseFailure') return input.is_interrupt ? 'interrompido' : 'falhou';
+  return resp.interrupted ? 'interrompido' : 'ok';
+}
+
 function hook() {
   let input = {};
   try { input = JSON.parse(readStdin() || '{}'); } catch {}
@@ -379,21 +389,19 @@ function hook() {
   const fields = {};
   if (name === 'Stop') fields.evento = 'agente-parado';
   else if (name === 'SubagentStop') fields.evento = 'subagente-finalizado';
-  else if (name === 'PostToolUse') {
+  else if (name === 'PostToolUse' || name === 'PostToolUseFailure') {
+    const failed = name === 'PostToolUseFailure';
     const tool = input.tool_name;
     const ti = input.tool_input || {};
     if (tool === 'Bash' || tool === 'PowerShell') {
       const cmd = String(ti.command || '');
       const hit = BASH_EVENTS.find(([re]) => re.test(cmd));
       if (!hit) return;
+      if (hit[1] === 'teste') fields.resultado = testResult(name, input);
+      else if (failed) return; // commit, push ou PR que falhou não aconteceu
       fields.evento = hit[1];
-      const resp = input.tool_response || {};
-      if (hit[1] === 'teste' && typeof resp === 'object') {
-        const code = resp.exitCode ?? resp.exit_code ?? resp.returnCode;
-        if (code !== undefined) fields.resultado = code === 0 ? 'ok' : 'falhou';
-        else if (resp.interrupted) fields.resultado = 'interrompido';
-      }
-    } else if (['Edit', 'Write', 'MultiEdit'].includes(tool)) {
+    } else if (failed) return;
+    else if (['Edit', 'Write', 'MultiEdit'].includes(tool)) {
       const fp = path.resolve(cwd, String(ti.file_path || ''));
       const tasksDir = path.join(stateDir, 'tasks') + path.sep;
       if (!fp.toLowerCase().startsWith(tasksDir.toLowerCase()) || !fp.endsWith('.md')) return;

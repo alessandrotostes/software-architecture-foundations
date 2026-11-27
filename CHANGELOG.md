@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.0.1 — 2026-11-27
+
+### Corrigido
+- Hooks: teste que falhava não aparecia no painel. O Claude Code manda comando com saída diferente
+  de zero para `PostToolUseFailure`, que o `hooks/hooks.json` não registrava. Agora registra (só para
+  Bash e PowerShell) e o `ws.mjs` grava `teste` com `resultado=falhou`, ou `interrompido` quando a
+  pessoa interrompe.
+- Hooks: teste que passava era gravado sem `resultado`, porque a resposta do `PostToolUse` não traz
+  `exitCode`. Agora sai com `resultado=ok`.
+- Hooks: commit, push e PR cujo comando falhou não são mais gravados como se tivessem acontecido.
+
+### Adicionado
+- `test/ws.test.mjs`: testes do `ws.mjs hook` com os payloads reais do Claude Code, sem dependências.
+  Rode com `node --test`.
+
 ## 2.0.0 — 2026-11-27
 
 ### Adicionado
